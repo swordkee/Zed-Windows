@@ -41,6 +41,7 @@ jobs:
       run: |
         # Clone repo
         git clone https://github.com/zed-industries/zed
+        git checkout v0.138.6
         cd zed
         # Install npm dependencies
         npm install
