@@ -40,9 +40,8 @@ jobs:
     - name: Clone and Build Zed IDE
       run: |
         # Clone repo
-        git clone https://github.com/zed-industries/zed
+        git clone -b v0.138.6 --depth=1 https://github.com/zed-industries/zed
         cd zed
-        git checkout v0.138.6
         # Install npm dependencies
         #npm install
         # Build with npm
