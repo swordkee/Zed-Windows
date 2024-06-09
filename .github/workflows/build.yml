@@ -1,0 +1,55 @@
+name: Build Zed IDE
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Install Dependencies
+      run: |
+        choco install dotnetcore-sdk --version=8.0 -y
+        choco install visualstudio2019buildtools -y
+        choco install rustup.install -y
+    - name: Install and Setup Rust
+      shell: powershell
+      run: |
+        rustup update
+        rustup default stable
+        rustup target add wasm32-unknown-unknown
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0' # Specify the .NET Core SDK version you need
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Clone and Build Zed IDE
+      run: |
+        # Clone repo
+        git clone https://github.com/zed-industries/zed
+        cd zed
+        # Install npm dependencies
+        npm install
+        # Build with npm
+        npm run build
+        # Build with Cargo
+        cargo build --release
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: zed-ide-build
+        path: zed/target/release/zed.exe
