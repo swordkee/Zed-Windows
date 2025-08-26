@@ -1,23 +1,25 @@
-name: Manual Build Linux x86_64
+name: Build from Release Tag v1.19
 
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: '要构建的分支'
+      # 移除分支选择，改为固定触发
+      action:
+        description: '触发类型'
         required: true
-        default: '1.19'
+        default: 'build'
+        enum: [build, dry-run]
 
 jobs:
   build-linux-x86_64:
     name: 编译 Linux x86_64 二进制
     runs-on: rockylinux:9
     steps:
-      - name: 检出代码
+      - name: 检出指定标签
         uses: actions/checkout@v4
         with:
           repository: meilisearch/meilisearch
-          ref: ${{ inputs.branch }}
+          ref: refs/tags/v1.19  # 直接指定标签引用
 
       - name: 安装基础依赖
         run: |
@@ -44,11 +46,11 @@ jobs:
           name: meilisearch-linux-x86_64
           path: target/release/meilisearch
 
-      - name: 上传到 Release（可选）
-        if: github.event_name == 'release'
+      - name: 上传到 Release（仅正式构建）
+        if: github.event_name == 'release' && inputs.action == 'build'
         uses: svenstaro/upload-release-action@2.11.2
         with:
           repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}
           file: target/release/meilisearch
           asset_name: meilisearch-linux-x86_64
-          tag: ${{ github.ref }}
+          tag: v1.19  # 强制绑定标签版本
