@@ -17,14 +17,7 @@ jobs:
     runs-on: ubuntu-latest  # GitHub 托管的 Ubuntu 运行器启动容器
 
     steps:
-      ###########################
-      # 步骤 1：检出指定分支代码（默认 1.19.1）
-      ###########################
-      - name: 检出代码（标签 1.19.1）
-        uses: actions/checkout@v4
-        with:
-          repository: meilisearch/meilisearch
-          ref: ${{ inputs.branch }}  # 输入参数默认值为 1.19.1
+
 
       ###########################
       # 步骤 2：安装基础依赖（适配 Rocky Linux 9）
@@ -42,7 +35,14 @@ jobs:
 
           # 软链接 cmake3 到 cmake（若需要）
           sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
-
+      ###########################
+      # 步骤 1：检出指定分支代码（默认 1.19.1）
+      ###########################
+      - name: 检出代码（标签 1.19.1）
+        uses: actions/checkout@v4
+        with:
+          repository: meilisearch/meilisearch
+          ref: ${{ inputs.branch }}  # 输入参数默认值为 1.19.1
       ###########################
       # 步骤 3：配置 Rust 工具链（稳定版 1.85+）
       ###########################
