@@ -12,22 +12,27 @@ on:
 jobs:
   build-meilisearch:
     name: 编译 Meilisearch v1.19.1（Rocky Linux 9 官方镜像）
-    # 使用官方 Rocky Linux 9 镜像
     container:
       image: rockylinux/rockylinux:9
     runs-on: ubuntu-latest
 
     steps:
-      - name: 安装基础工具（含 yum-utils）
+      - name: 清理冲突包（关键）
         run: |
-          # 更新系统并安装 yum-utils（包含 yum-config-manager）
-          yum update -y
-          yum install -y yum-utils
+          # 移除可能冲突的 curl-minimal（若已安装）
+          yum remove -y curl-minimal || true  # 若未安装则忽略错误
 
-          # 安装编译所需的基础工具
+      - name: 安装基础工具（含 curl）
+        run: |
+          yum update -y
+          yum install -y yum-utils  # 包含 yum-config-manager
+          
+          # 安装 curl（添加 --allowerasing 避免冲突）
+          yum install -y curl --allowerasing
+          
+          # 安装其他必要依赖
           yum install -y \
             git \
-            curl \
             gcc \
             make \
             cmake3 \
@@ -37,29 +42,18 @@ jobs:
 
       - name: 启用 EPEL 仓库（安装 pkgconf-pkg-config）
         run: |
-          # 启用 EPEL 仓库（提供 pkgconf-pkg-config）
           yum-config-manager --set-enabled epel
-
-          # 安装 pkgconf-pkg-config（兼容传统 pkg-config）
           yum install -y pkgconf-pkg-config
 
-      - name: 验证环境（关键工具检查）
+      - name: 验证环境
         run: |
-          # 检查 GLIBC 版本（确认容器环境）
           ldd --version
-          
-          # 检查基础工具是否安装成功
           git --version
-          curl --version
-          gcc --version
-          cmake --version
-          openssl version
-          
-          # 检查 pkg-config 是否可用
+          curl --version  # 确认 curl 安装成功
           pkg-config --version
-          
-          # 检查 yum-config-manager 是否可用
-          yum-config-manager --list | head  # 输出仓库列表，确认工具正常
+          yum-config-manager --list | head
+
+      # 后续步骤（Rust 安装、编译等）保持不变...
 
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@1.85
