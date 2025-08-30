@@ -28,9 +28,6 @@ jobs:
           # 安装 bash（最小化镜像可能未预装）
           yum install -y bash
           
-          # 安装 curl（用于下载文件）
-          yum install -y curl
-          
           # 安装 wget（备用下载工具）
           yum install -y wget
 
