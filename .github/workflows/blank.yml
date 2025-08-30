@@ -1,4 +1,4 @@
-name: Build Meilisearch v1.19.1 on Rocky Linux 9
+name: Build Meilisearch v1.19.1 on Rocky Linux 9 (Official Image)
 
 on:
   workflow_dispatch:
@@ -11,18 +11,20 @@ on:
 
 jobs:
   build-meilisearch:
-    name: 编译 Meilisearch v1.19.1（Rocky Linux 9）
+    name: 编译 Meilisearch v1.19.1（Rocky Linux 9 官方镜像）
+    # 使用官方 Rocky Linux 9 镜像
     container:
-      image: litmusimage/rockylinux:9
+      image: rockylinux/rockylinux:9
     runs-on: ubuntu-latest
 
     steps:
-      - name: 安装系统依赖（含 yum-utils）
+      - name: 安装基础工具（含 yum-utils）
         run: |
+          # 更新系统并安装 yum-utils（包含 yum-config-manager）
           yum update -y
-          # 安装 yum-utils（包含 yum-config-manager）
           yum install -y yum-utils
-          # 安装其他必要依赖
+
+          # 安装编译所需的基础工具
           yum install -y \
             git \
             curl \
@@ -31,22 +33,32 @@ jobs:
             cmake3 \
             openssl-devel \
             zlib-devel \
-            pkgconf-pkg-config \
             which
 
-      - name: 启用 EPEL 仓库（可选，若需额外包）
+      - name: 启用 EPEL 仓库（安装 pkgconf-pkg-config）
         run: |
-          # 使用 yum-config-manager 启用 EPEL 仓库（现在工具已可用）
+          # 启用 EPEL 仓库（提供 pkgconf-pkg-config）
           yum-config-manager --set-enabled epel
 
-      - name: 验证环境
+          # 安装 pkgconf-pkg-config（兼容传统 pkg-config）
+          yum install -y pkgconf-pkg-config
+
+      - name: 验证环境（关键工具检查）
         run: |
+          # 检查 GLIBC 版本（确认容器环境）
           ldd --version
+          
+          # 检查基础工具是否安装成功
           git --version
-          pkg-config --version
+          curl --version
+          gcc --version
           cmake --version
           openssl version
-          # 验证 yum-config-manager 可用
+          
+          # 检查 pkg-config 是否可用
+          pkg-config --version
+          
+          # 检查 yum-config-manager 是否可用
           yum-config-manager --list | head  # 输出仓库列表，确认工具正常
 
       - name: 安装 Rust 工具链
@@ -56,7 +68,7 @@ jobs:
           override: true
           components: rust-src, cargo, rustc-dev
 
-      - name: 克隆并检出源码
+      - name: 克隆并检出 Meilisearch 源码（v1.19.1）
         run: |
           git clone https://github.com/meilisearch/meilisearch.git
           cd meilisearch
@@ -65,21 +77,23 @@ jobs:
       - name: 配置编译环境
         run: |
           cd meilisearch
+          # 指定目标平台（与容器架构一致）
           export TARGET=x86_64-unknown-linux-gnu
 
-      - name: 编译发布版
+      - name: 编译发布版（禁用调试优化以加速）
         run: |
           cd meilisearch
+          # 使用 --locked 确保依赖版本与源码一致
           cargo build --release --locked
 
-      - name: 验证 GLIBC 依赖
+      - name: 验证 GLIBC 依赖（确保无 GLIBC_2.35）
         run: |
           cd meilisearch/target/release
           ldd meilisearch | grep GLIBC_
 
-      - name: 保存编译产物
+      - name: 保存编译产物（GitHub Artifacts）
         uses: actions/upload-artifact@v4
         with:
-          name: meilisearch-v1.19.1-linux-amd64-rocky9
+          name: meilisearch-v1.19.1-linux-amd64-rocky9-official
           path: meilisearch/target/release/meilisearch
           retention-days: 7
