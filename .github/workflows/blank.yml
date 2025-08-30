@@ -24,7 +24,6 @@ jobs:
           # 更新系统并安装必需工具
           yum update -y
           yum install -y \
-            bash \          # 关键：安装 bash
             git \
             gcc \
             make \
