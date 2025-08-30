@@ -1,142 +1,94 @@
-name: Build Meilisearch v1.19.1 on Rocky Linux 9
+name: Manual Build Linux x86_64 (Rocky Linux 9 镜像)
 
 on:
   workflow_dispatch:
     inputs:
-      action:
-        description: '触发类型（仅 build）'
+      branch:
+        description: '要构建的分支（默认：1.19.1）'
         required: true
-        default: 'build'
-        enum: [build]
+        default: '1.19.1'  # 默认分支改为 1.19.1
 
 jobs:
-  build-meilisearch:
-    name: 编译 Meilisearch v1.19.1（Rocky Linux 9）
+  build-linux-x86_64:
+    name: 编译 Linux x86_64 二进制（Rocky Linux 9 镜像）
+    # 使用 rockylinux/rockylinux:9 官方镜像（标签 1.19.1 对应镜像需确认是否存在，若不存在可省略标签）
     container:
-      image: rockylinux/rockylinux:9
-    runs-on: ubuntu-latest
+      image: rockylinux/rockylinux:9  # 指定镜像名称和标签（若镜像支持标签 1.19.1，可写为 rockylinux/rockylinux:9.1.19.1）
+    runs-on: ubuntu-latest  # GitHub 托管的 Ubuntu 运行器启动容器
 
     steps:
       ###########################
-      # 步骤 1：安装基础工具（含 bash、curl、wget）
+      # 步骤 1：检出指定分支代码（默认 1.19.1）
       ###########################
-      - name: 安装基础工具（关键）
+      - name: 检出代码（标签 1.19.1）
+        uses: actions/checkout@v4
+        with:
+          repository: meilisearch/meilisearch
+          ref: ${{ inputs.branch }}  # 输入参数默认值为 1.19.1
+
+      ###########################
+      # 步骤 2：安装基础依赖（适配 Rocky Linux 9）
+      ###########################
+      - name: 安装基础依赖
         run: |
-          # 更新系统包索引
+          # Rocky Linux 9 使用 yum 作为包管理器（原 dnf 可能需要调整为 yum）
           yum update -y
-          
-          # 安装 bash（最小化镜像可能未预装）
-          yum install -y bash
-          
-          # 安装 curl（用于下载文件）
-          yum install -y wget
-          
-          # 安装其他编译必需工具
           yum install -y \
             git \
             gcc \
             make \
             cmake3 \
-            openssl-devel \
-            zlib-devel \
-            which \
-            pkgconf-pkg-config \
-            yum-utils  # 包含 yum-config-manager
+            which  # 路径查找工具
+
+          # 软链接 cmake3 到 cmake（若需要）
+          sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
 
       ###########################
-      # 步骤 2：验证 bash 可用性
+      # 步骤 3：配置 Rust 工具链（稳定版 1.85+）
       ###########################
-      - name: 验证 bash 安装
+      - name: 配置 Rust 工具链
+        uses: dtolnay/rust-toolchain@1.85  # 匹配 Meilisearch 推荐版本
+        with:
+          toolchain: stable  # 稳定版
+          override: true     # 覆盖系统默认 Rust（如有）
+
+      ###########################
+      # 步骤 4：设置交叉编译环境（x86_64-unknown-linux-gnu）
+      ###########################
+      - name: 设置交叉编译环境
         run: |
-          # 检查 bash 路径（应输出 /usr/bin/bash）
-          which bash
-          
-          # 检查 PATH 环境变量（应包含 /usr/bin）
-          echo "PATH: $PATH"
+          # 配置 cargo 链接器（使用系统默认 gcc）
+          mkdir -p ~/.cargo
+          echo '[target.x86_64-unknown-linux-gnu]' >> ~/.cargo/config
+          echo 'linker = "gcc"' >> ~/.cargo/config
 
       ###########################
-      # 步骤 3：安装 Rust 工具链（强制非交互式 + CI 环境）
+      # 步骤 5：编译发布版（禁用调试优化）
       ###########################
-      - name: 安装 Rust 工具链（rustup）
-        run: |
-          # 设置 CI 环境变量（告知 rustup 处于非交互式环境）
-          export CI=true
-          
-          # 手动下载 rustup 安装脚本（避免 curl 管道符参数丢失）
-          curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
-          
-         
-
-          # 清理安装脚本（可选）
-          rm -f rustup-installer.sh
-
-          # 验证 cargo 是否安装成功（输出版本信息）
-          cargo --version
-
-      ###########################
-      # 步骤 4：配置 cargo 路径（可选，若自动配置失败）
-      ###########################
-      - name: 配置 cargo 路径
-        run: |
-          # 将 cargo 加入 PATH（rustup 通常自动配置，若失败则手动添加）
-          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-          source ~/.bashrc
-
-      ###########################
-      # 步骤 5：安装 EPEL 仓库（依赖 curl/wget）
-      ###########################
-      - name: 安装 EPEL 仓库
-        run: |
-          # 下载 EPEL 9 最新仓库包
-          wget -q https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-          
-          # 安装 EPEL 仓库
-          yum install -y ./epel-release-latest-9.noarch.rpm
-
-      ###########################
-      # 步骤 6：启用 EPEL 仓库并安装 pkgconf-pkg-config
-      ###########################
-      - name: 启用 EPEL 仓库并安装 pkgconf-pkg-config
-        run: |
-          # 启用 EPEL 仓库
-          yum-config-manager --set-enabled epel
-          
-          # 安装 pkgconf-pkg-config（提供兼容的 pkg-config 工具）
-          yum install -y pkgconf-pkg-config
-
-      ###########################
-      # 步骤 7：克隆并编译 Meilisearch 源码
-      ###########################
-      - name: 克隆并检出源码
-        run: |
-          git clone https://github.com/meilisearch/meilisearch.git
-          cd meilisearch
-          git checkout tags/v1.19.1
-
-      - name: 配置编译环境
-        run: |
-          cd meilisearch
-          export TARGET=x86_64-unknown-linux-gnu
-
       - name: 编译发布版
         run: |
           cd meilisearch
+          # 使用 --locked 确保依赖版本与源码一致
           cargo build --release --locked
 
       ###########################
-      # 步骤 8：验证 GLIBC 依赖
+      # 步骤 6：保存构建产物（GitHub Artifacts）
       ###########################
-      - name: 验证 GLIBC 依赖
-        run: |
-          cd meilisearch/target/release
-          ldd meilisearch | grep GLIBC_
+      - name: 保存构建产物
+        uses: actions/upload-artifact@v4  # 升级到 v4（更稳定）
+        with:
+          name: meilisearch-linux-x86_64-rocky9  # 工件名称（含镜像信息）
+          path: target/release/meilisearch       # 编译产物路径
+          retention-days: 7                      # 保留 7 天
 
       ###########################
-      # 步骤 9：保存编译产物
+      # 步骤 7：上传到 Release（可选，触发发布时）
       ###########################
-      - name: 保存编译产物
-        uses: actions/upload-artifact@v4
+      - name: 上传到 Release（可选）
+        if: github.event_name == 'release'  # 仅在创建 Release 时触发
+        uses: svenstaro/upload-release-action@2.11.2
         with:
-          name: meilisearch-v1.19.1-linux-amd64-rocky9
-          path: meilisearch/target/release/meilisearch
-          retention-days: 7
+          repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}  # GitHub Token（需提前配置 Secret）
+          file: target/release/meilisearch             # 待上传文件
+          asset_name: meilisearch-linux-x86_64-rocky9  # Release 资产名称
+          tag: ${{ github.ref }}                       # 关联 Release 标签
