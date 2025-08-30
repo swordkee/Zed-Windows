@@ -28,7 +28,7 @@ jobs:
             cmake3 \
             openssl-devel \
             zlib-devel \
-            pkgconfig \
+            pkgconf-pkg-config \
             which
           sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
 
