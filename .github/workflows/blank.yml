@@ -82,7 +82,7 @@ jobs:
         run: |
           cd meilisearch
           # 使用 --locked 确保依赖版本与源码一致
-          cargo build --release --locked
+          $HOME/.cargo/bin/cargo build --release --locked
 
       ###########################
       # 步骤 6：保存构建产物（GitHub Artifacts）
