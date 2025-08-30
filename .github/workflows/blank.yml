@@ -31,6 +31,9 @@ jobs:
             gcc \
             make \
             cmake3 \
+            sudo \
+            wget \
+            pkgconf-pkg-config \
             which  # 路径查找工具
 
           # 软链接 cmake3 到 cmake（若需要）
