@@ -30,7 +30,16 @@ jobs:
           
           # 安装 wget（备用下载工具）
           yum install -y wget
-
+          yum install -y \
+            git \
+            gcc \
+            make \
+            cmake3 \
+            openssl-devel \
+            zlib-devel \
+            which \
+            pkgconf-pkg-config \
+            yum-utils  # 包含 yum-config-manager
       ###########################
       # 步骤 2：验证 bash 可用性
       ###########################
