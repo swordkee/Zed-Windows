@@ -31,7 +31,6 @@ jobs:
           # 安装其他基础工具（编译必需）
           yum install -y \
             git \
-            curl \
             gcc \
             make \
             cmake3 \
