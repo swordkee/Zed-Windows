@@ -17,18 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 验证容器启动
-        run: |
-          ldd --version
-          git --version
-          curl --version
-          gcc --version
-
-      - name: 安装系统依赖
+      - name: 安装系统依赖（含 git）
         run: |
           yum update -y
           yum install -y \
-            git \
+            git \  # 确保 git 在此步骤安装
             curl \
             gcc \
             make \
@@ -39,6 +32,14 @@ jobs:
             which
           sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
 
+      - name: 验证容器环境（含 git 检查）
+        run: |
+          # 先检查基础工具（此时 git 已安装）
+          ldd --version  # 验证 GLIBC 版本
+          git --version  # 现在 git 已安装，不会报错
+          curl --version
+          gcc --version
+
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@1.85
         with:
@@ -48,7 +49,7 @@ jobs:
 
       - name: 克隆并检出源码
         run: |
-          git clone https://github.com/meilisearch/meilisearch.git
+          git clone https://github.com/meilisearch/meilisearch.git  # git 已安装，可正常执行
           cd meilisearch
           git checkout tags/v1.19.1
 
@@ -67,14 +68,9 @@ jobs:
           cd meilisearch/target/release
           ldd meilisearch | grep GLIBC_
 
-      - name: 保存编译产物（升级为 upload-artifact@v4）
-        uses: actions/upload-artifact@v4  # 关键修改：替换为 v4
+      - name: 保存编译产物（upload-artifact@v4）
+        uses: actions/upload-artifact@v4
         with:
-          name: meilisearch-v1.19.1-linux-amd64-rocky9  # 必填：工件名称
-          path: meilisearch/target/release/meilisearch  # 必填：容器内文件路径（绝对或相对）
-          retention-days: 7  # 可选：工件保留天数
-
-      - name: 输出失败日志（可选）
-        if: failure()
-        run: |
-          cat meilisearch/target/debug/build.log
+          name: meilisearch-v1.19.1-linux-amd64-rocky9
+          path: meilisearch/target/release/meilisearch
+          retention-days: 7
