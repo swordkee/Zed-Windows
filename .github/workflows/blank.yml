@@ -17,14 +17,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 安装 EPEL 仓库（确保 pkgconf-pkg-config 可用）
-        run: |
-          yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-          yum-config-manager --set-enabled epel
-
-      - name: 安装系统依赖
+      - name: 安装系统依赖（含 yum-utils）
         run: |
           yum update -y
+          # 安装 yum-utils（包含 yum-config-manager）
+          yum install -y yum-utils
+          # 安装其他必要依赖
           yum install -y \
             git \
             curl \
@@ -33,9 +31,13 @@ jobs:
             cmake3 \
             openssl-devel \
             zlib-devel \
-            pkgconf-pkg-config \  # 从 EPEL 或默认仓库安装
+            pkgconf-pkg-config \
             which
-          sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
+
+      - name: 启用 EPEL 仓库（可选，若需额外包）
+        run: |
+          # 使用 yum-config-manager 启用 EPEL 仓库（现在工具已可用）
+          yum-config-manager --set-enabled epel
 
       - name: 验证环境
         run: |
@@ -44,6 +46,8 @@ jobs:
           pkg-config --version
           cmake --version
           openssl version
+          # 验证 yum-config-manager 可用
+          yum-config-manager --list | head  # 输出仓库列表，确认工具正常
 
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@1.85
