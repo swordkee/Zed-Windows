@@ -12,148 +12,120 @@ on:
 jobs:
   build-meilisearch:
     name: 编译 Meilisearch v1.19.1（Rocky Linux 9）
-    # 使用官方 Rocky Linux 9 镜像
     container:
       image: rockylinux/rockylinux:9
-    runs-on: ubuntu-latest  # GitHub 托管的 Ubuntu 运行器启动容器
+    runs-on: ubuntu-latest
 
     steps:
       ###########################
-      # 步骤 1：安装 EPEL 仓库（关键）
+      # 步骤 1：安装基础工具（含 wget）
+      ###########################
+      - name: 安装基础工具（关键）
+        run: |
+          # 更新系统包索引（确保获取最新包信息）
+          yum update -y
+          
+          # 安装 wget（用于下载 EPEL 仓库包）
+          yum install -y wget
+          
+          # 安装其他基础工具（编译必需）
+          yum install -y \
+            git \
+            curl \
+            gcc \
+            make \
+            cmake3 \
+            openssl-devel \
+            zlib-devel \
+            which \
+            yum-utils  # 包含 yum-config-manager
+
+      ###########################
+      # 步骤 2：安装 EPEL 仓库（依赖 wget）
       ###########################
       - name: 安装 EPEL 仓库
         run: |
-          # 下载 EPEL 9 最新仓库包（Rocky Linux 9 兼容）
+          # 下载 EPEL 9 最新仓库包（使用已安装的 wget）
           wget -q https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
           
           # 安装 EPEL 仓库（生成 /etc/yum.repos.d/epel.repo）
           yum install -y ./epel-release-latest-9.noarch.rpm
 
       ###########################
-      # 步骤 2：安装基础工具（含 yum-utils）
-      ###########################
-      - name: 安装基础工具
-        run: |
-          # 更新系统并安装 yum-utils（包含 yum-config-manager）
-          yum update -y
-          yum install -y yum-utils
-
-          # 安装编译必需的工具链和库
-          yum install -y \
-            git \                  # 代码拉取
-            curl \                 # 下载依赖（解决冲突后）
-            gcc \                  # C 编译器
-            make \                 # 构建工具
-            cmake3 \               # CMake（需软链接到 cmake）
-            openssl-devel \        # OpenSSL 开发库
-            zlib-devel \           # zlib 开发库
-            which                  # 路径查找工具
-
-      ###########################
-      # 步骤 3：解决 curl 包冲突
-      ###########################
-      - name: 解决 curl 包冲突
-        run: |
-          # 移除可能冲突的 curl-minimal（若已安装）
-          yum remove -y curl-minimal || true  # 忽略未安装的错误
-          
-          # 安装完整版 curl（允许覆盖潜在冲突文件）
-          yum install -y curl --allowerasing
-
-      ###########################
-      # 步骤 4：启用 EPEL 仓库并安装 pkgconf-pkg-config
+      # 步骤 3：启用 EPEL 仓库并安装 pkgconf-pkg-config
       ###########################
       - name: 启用 EPEL 仓库并安装 pkgconf-pkg-config
         run: |
-          # 启用 EPEL 仓库（确保配置生效）
+          # 启用 EPEL 仓库
           yum-config-manager --set-enabled epel
           
           # 安装 pkgconf-pkg-config（提供兼容的 pkg-config 工具）
           yum install -y pkgconf-pkg-config
 
       ###########################
+      # 步骤 4：解决 curl 包冲突（可选，若仍冲突）
+      ###########################
+      - name: 解决 curl 包冲突（可选）
+        run: |
+          # 移除可能冲突的 curl-minimal（若已安装）
+          yum remove -y curl-minimal || true
+          
+          # 安装完整版 curl（允许覆盖潜在冲突文件）
+          yum install -y curl --allowerasing
+
+      ###########################
       # 步骤 5：验证环境（关键检查）
       ###########################
       - name: 验证环境配置
         run: |
-          # 检查 GLIBC 版本（Rocky Linux 9 应为 2.34）
-          ldd --version
-          
-          # 检查基础工具是否安装成功
-          git --version
-          curl --version  # 确认 curl 无冲突
-          gcc --version
-          cmake --version  # 应指向 cmake3（软链接后）
-          openssl version
-          
-          # 检查 pkg-config 是否可用（兼容传统 pkg-config）
-          pkg-config --version
+          # 检查 wget 是否安装成功
+          wget --version  # 应输出 wget 版本信息（如 "GNU Wget 1.21.4"）
           
           # 检查 EPEL 仓库是否启用
           yum repolist enabled | grep epel  # 应输出 epel 仓库信息
           
-          # 检查 yum-config-manager 是否可用
-          yum-config-manager --list | head  # 输出仓库列表，确认工具正常
+          # 检查 pkg-config 是否可用
+          pkg-config --version
+          
+          # 检查其他基础工具（git、curl、gcc 等）
+          git --version
+          curl --version
+          gcc --version
 
       ###########################
-      # 步骤 6：安装 Rust 工具链
+      # 后续步骤（Rust 安装、编译等）保持不变...
       ###########################
       - name: 安装 Rust 工具链
-        uses: dtolnay/rust-toolchain@1.85  # Meilisearch 推荐的 Rust 版本
+        uses: dtolnay/rust-toolchain@1.85
         with:
-          toolchain: stable  # 稳定版
-          override: true     # 覆盖系统默认 Rust（如有）
-          components:        # 必要组件
-            rust-src
-            cargo
-            rustc-dev
+          toolchain: stable
+          override: true
+          components: rust-src, cargo, rustc-dev
 
-      ###########################
-      # 步骤 7：克隆并检出 Meilisearch 源码（v1.19.1）
-      ###########################
       - name: 克隆并检出源码
         run: |
-          # 克隆 Meilisearch 仓库
           git clone https://github.com/meilisearch/meilisearch.git
-          
-          # 切换到 v1.19.1 标签
           cd meilisearch
           git checkout tags/v1.19.1
 
-      ###########################
-      # 步骤 8：配置编译环境
-      ###########################
       - name: 配置编译环境
         run: |
           cd meilisearch
-          # 指定目标平台（与容器架构一致，x86_64-unknown-linux-gnu）
           export TARGET=x86_64-unknown-linux-gnu
 
-      ###########################
-      # 步骤 9：编译发布版（禁用调试优化）
-      ###########################
       - name: 编译发布版
         run: |
           cd meilisearch
-          # 使用 --locked 确保依赖版本与源码一致
-          # 使用 --release 生成发布版（优化级别更高）
           cargo build --release --locked
 
-      ###########################
-      # 步骤 10：验证 GLIBC 依赖（无 GLIBC_2.35）
-      ###########################
       - name: 验证 GLIBC 依赖
         run: |
           cd meilisearch/target/release
-          # 检查二进制文件的 GLIBC 依赖（应仅包含 GLIBC_2.34 及以下）
           ldd meilisearch | grep GLIBC_
 
-      ###########################
-      # 步骤 11：保存编译产物（GitHub Artifacts）
-      ###########################
       - name: 保存编译产物
         uses: actions/upload-artifact@v4
         with:
-          name: meilisearch-v1.19.1-linux-amd64-rocky9  # 工件名称（含版本和系统信息）
-          path: meilisearch/target/release/meilisearch  # 容器内二进制文件路径
-          retention-days: 7  # 工件保留 7 天（可调整）
+          name: meilisearch-v1.19.1-linux-amd64-rocky9
+          path: meilisearch/target/release/meilisearch
+          retention-days: 7
