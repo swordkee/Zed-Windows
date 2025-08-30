@@ -37,7 +37,7 @@ jobs:
             which  # 路径查找工具
 
           # 软链接 cmake3 到 cmake（若需要）
-          sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
+         # sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
       ###########################
       # 步骤 1：检出指定分支代码（默认 1.19.1）
       ###########################
