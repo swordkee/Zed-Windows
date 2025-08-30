@@ -17,19 +17,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 安装 CRB 仓库（关键）
+      - name: 安装 EPEL 仓库（确保 pkgconf-pkg-config 可用）
         run: |
-          yum install -y https://download.rockylinux.org/pub/rocky/9/crb/x86_64/os/Packages/c/crb-1.0.0-1.el9.noarch.rpm
-          yum-config-manager --enable crb
+          yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+          yum-config-manager --set-enabled epel
 
-      - name: 安装系统依赖（含包存在性检查）
+      - name: 安装系统依赖
         run: |
           yum update -y
-          
-          # 检查关键包是否存在
-          yum list available pkgconf-pkg-config cmake3 openssl-devel
-          
-          # 安装依赖
           yum install -y \
             git \
             curl \
@@ -38,8 +33,9 @@ jobs:
             cmake3 \
             openssl-devel \
             zlib-devel \
-            pkgconf-pkg-config \
+            pkgconf-pkg-config \  # 从 EPEL 或默认仓库安装
             which
+          sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
 
       - name: 验证环境
         run: |
