@@ -1,4 +1,4 @@
-name: Manual Build Linux x86_64 (Rocky Linux 9 镜像)
+name: Manual Build Linux x86_64 (Rocky Linux 9)
 
 on:
   workflow_dispatch:
@@ -6,27 +6,25 @@ on:
       branch:
         description: '要构建的分支（默认：1.19.1）'
         required: true
-        default: '1.19.1'  # 默认分支改为 1.19.1
+        default: '1.19.1'
 
 jobs:
   build-linux-x86_64:
-    name: 编译 Linux x86_64 二进制（Rocky Linux 9 镜像）
-    # 使用 rockylinux/rockylinux:9 官方镜像（标签 1.19.1 对应镜像需确认是否存在，若不存在可省略标签）
+    name: 编译 Linux x86_64 二进制（Rocky Linux 9）
     container:
-      image: rockylinux/rockylinux:9  # 指定镜像名称和标签（若镜像支持标签 1.19.1，可写为 rockylinux/rockylinux:9.1.19.1）
-    runs-on: ubuntu-latest  # GitHub 托管的 Ubuntu 运行器启动容器
+      image: rockylinux/rockylinux:9
+    runs-on: ubuntu-latest
 
     steps:
-
-
       ###########################
-      # 步骤 2：安装基础依赖（适配 Rocky Linux 9）
+      # 步骤 1：安装基础依赖（适配 Rocky Linux 9）
       ###########################
       - name: 安装基础依赖
         run: |
-          # Rocky Linux 9 使用 yum 作为包管理器（原 dnf 可能需要调整为 yum）
+          # 更新系统并安装必需工具
           yum update -y
           yum install -y \
+            bash \          # 关键：安装 bash
             git \
             gcc \
             make \
@@ -34,29 +32,50 @@ jobs:
             sudo \
             wget \
             pkgconf-pkg-config \
-            which  # 路径查找工具
+            which \
+            openssl-devel \   # SSL 支持
+            zlib-devel        # 压缩库支持
 
-          # 软链接 cmake3 到 cmake（若需要）
-         # sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
+          # 创建 cmake 软链接（使 cmake 命令可用）
+          ln -sf /usr/bin/cmake3 /usr/bin/cmake
+
+          # 验证 bash 安装
+          bash --version
+
       ###########################
-      # 步骤 1：检出指定分支代码（默认 1.19.1）
+      # 步骤 2：克隆并检出源码
       ###########################
       - name: 克隆并检出源码
         run: |
           git clone https://github.com/meilisearch/meilisearch.git
           cd meilisearch
           git checkout tags/v1.19.1
-      ###########################
-      # 步骤 3：配置 Rust 工具链（稳定版 1.85+）
-      ###########################
-      - name: 配置 Rust 工具链
-        uses: dtolnay/rust-toolchain@1.85  # 匹配 Meilisearch 推荐版本
-        with:
-          toolchain: stable  # 稳定版
-          override: true     # 覆盖系统默认 Rust（如有）
+          
+          # 验证检出结果
+          git status
 
       ###########################
-      # 步骤 4：设置交叉编译环境（x86_64-unknown-linux-gnu）
+      # 步骤 3：手动安装 Rust 工具链（非交互式）
+      ###########################
+      - name: 手动安装 Rust 工具链
+        run: |
+          # 安装 rustup（需要 curl）
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
+            --default-toolchain 1.85.1 \
+            --profile minimal \
+            --no-self-update \
+            -y  # 非交互式安装
+          
+          # 将 cargo 加入 PATH
+          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
+          
+          # 验证安装
+          rustc --version
+          cargo --version
+
+      ###########################
+      # 步骤 4：设置交叉编译环境
       ###########################
       - name: 设置交叉编译环境
         run: |
@@ -66,32 +85,44 @@ jobs:
           echo 'linker = "gcc"' >> ~/.cargo/config
 
       ###########################
-      # 步骤 5：编译发布版（禁用调试优化）
+      # 步骤 5：编译发布版
       ###########################
       - name: 编译发布版
         run: |
           cd meilisearch
-          # 使用 --locked 确保依赖版本与源码一致
+          # 使用 --locked 确保依赖版本一致
           cargo build --release --locked
 
-      ###########################
-      # 步骤 6：保存构建产物（GitHub Artifacts）
-      ###########################
-      - name: 保存构建产物
-        uses: actions/upload-artifact@v4  # 升级到 v4（更稳定）
-        with:
-          name: meilisearch-linux-x86_64-rocky9  # 工件名称（含镜像信息）
-          path: target/release/meilisearch       # 编译产物路径
-          retention-days: 7                      # 保留 7 天
+          # 验证编译产物存在
+          ls -lh target/release/meilisearch
 
       ###########################
-      # 步骤 7：上传到 Release（可选，触发发布时）
+      # 步骤 6：验证 GLIBC 依赖
       ###########################
-      - name: 上传到 Release（可选）
-        if: github.event_name == 'release'  # 仅在创建 Release 时触发
+      - name: 验证 GLIBC 依赖
+        run: |
+          cd meilisearch/target/release
+          ldd meilisearch | grep GLIBC_
+          # 应只显示 GLIBC_2.34 及以下版本
+
+      ###########################
+      # 步骤 7：保存构建产物
+      ###########################
+      - name: 保存构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: meilisearch-linux-x86_64-rocky9
+          path: meilisearch/target/release/meilisearch
+          retention-days: 7
+
+      ###########################
+      # 步骤 8：上传到 Release（可选）
+      ###########################
+      - name: 上传到 Release
+        if: github.event_name == 'release'
         uses: svenstaro/upload-release-action@2.11.2
         with:
-          repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}  # GitHub Token（需提前配置 Secret）
-          file: target/release/meilisearch             # 待上传文件
-          asset_name: meilisearch-linux-x86_64-rocky9  # Release 资产名称
-          tag: ${{ github.ref }}                       # 关联 Release 标签
+          repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}
+          file: meilisearch/target/release/meilisearch
+          asset_name: meilisearch-linux-x86_64-rocky9
+          tag: ${{ github.ref }}
