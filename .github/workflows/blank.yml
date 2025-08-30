@@ -28,8 +28,10 @@ jobs:
           # 安装 bash（最小化镜像可能未预装）
           yum install -y bash
           
-          # 安装 wget（备用下载工具）
+          # 安装 curl（用于下载文件）
           yum install -y wget
+          
+          # 安装其他编译必需工具
           yum install -y \
             git \
             gcc \
@@ -40,6 +42,7 @@ jobs:
             which \
             pkgconf-pkg-config \
             yum-utils  # 包含 yum-config-manager
+
       ###########################
       # 步骤 2：验证 bash 可用性
       ###########################
@@ -52,13 +55,15 @@ jobs:
           echo "PATH: $PATH"
 
       ###########################
-      # 步骤 3：安装 Rust 工具链（非交互式）
+      # 步骤 3：安装 Rust 工具链（强制非交互式）
       ###########################
       - name: 安装 Rust 工具链（rustup）
         run: |
-          # 使用 curl 下载 rustup 安装脚本（确保 curl 已安装）
+          # 设置 CI 环境变量（告知 rustup 处于非交互式环境）
+          export CI=true
+          
+          # 使用 curl 下载 rustup 安装脚本，并通过 sh 传递所有参数
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-          # 添加 --no-interactive 参数禁用交互式提示
           sh -s -- \
             --default-toolchain 1.85.1 \
             --component rust-src \
@@ -66,7 +71,7 @@ jobs:
             --component rustc-dev \
             --profile minimal \
             --no-self-update \
-            --no-interactive  # 关键：非交互式安装
+            --no-interactive  # 关键：强制非交互式
 
           # 验证 cargo 是否安装成功（输出版本信息）
           cargo --version
