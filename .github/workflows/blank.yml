@@ -26,7 +26,7 @@ jobs:
           yum update -y
           
           # 安装 bash（最小化镜像可能未预装）
-          yum install -y bash
+          yum install -y bash wget
           
           # 安装其他编译必需工具
           yum install -y \
