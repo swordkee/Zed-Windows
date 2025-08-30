@@ -17,11 +17,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 安装系统依赖（含 git）
+      - name: 安装 CRB 仓库（关键）
+        run: |
+          yum install -y https://download.rockylinux.org/pub/rocky/9/crb/x86_64/os/Packages/c/crb-1.0.0-1.el9.noarch.rpm
+          yum-config-manager --enable crb
+
+      - name: 安装系统依赖（含包存在性检查）
         run: |
           yum update -y
+          
+          # 检查关键包是否存在
+          yum list available pkgconf-pkg-config cmake3 openssl-devel
+          
+          # 安装依赖
           yum install -y \
-            git \  # 确保 git 在此步骤安装
+            git \
             curl \
             gcc \
             make \
@@ -30,15 +40,14 @@ jobs:
             zlib-devel \
             pkgconf-pkg-config \
             which
-          sudo ln -sf /usr/bin/cmake3 /usr/bin/cmake
 
-      - name: 验证容器环境（含 git 检查）
+      - name: 验证环境
         run: |
-          # 先检查基础工具（此时 git 已安装）
-          ldd --version  # 验证 GLIBC 版本
-          git --version  # 现在 git 已安装，不会报错
-          curl --version
-          gcc --version
+          ldd --version
+          git --version
+          pkg-config --version
+          cmake --version
+          openssl version
 
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@1.85
@@ -49,7 +58,7 @@ jobs:
 
       - name: 克隆并检出源码
         run: |
-          git clone https://github.com/meilisearch/meilisearch.git  # git 已安装，可正常执行
+          git clone https://github.com/meilisearch/meilisearch.git
           cd meilisearch
           git checkout tags/v1.19.1
 
@@ -68,7 +77,7 @@ jobs:
           cd meilisearch/target/release
           ldd meilisearch | grep GLIBC_
 
-      - name: 保存编译产物（upload-artifact@v4）
+      - name: 保存编译产物
         uses: actions/upload-artifact@v4
         with:
           name: meilisearch-v1.19.1-linux-amd64-rocky9
