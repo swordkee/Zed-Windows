@@ -18,17 +18,17 @@ jobs:
 
     steps:
       ###########################
-      # 步骤 1：安装基础工具（含 wget）
+      # 步骤 1：安装基础工具（含 bash）
       ###########################
       - name: 安装基础工具（关键）
         run: |
-          # 更新系统包索引（确保获取最新包信息）
+          # 更新系统包索引
           yum update -y
           
-          # 安装 wget（用于下载 EPEL 仓库包）
-          yum install -y wget
+          # 安装 bash（最小化镜像可能未预装）
+          yum install -y bash
           
-          # 安装其他基础工具（编译必需）
+          # 安装其他编译必需工具
           yum install -y \
             git \
             gcc \
@@ -40,67 +40,60 @@ jobs:
             yum-utils  # 包含 yum-config-manager
 
       ###########################
-      # 步骤 2：安装 EPEL 仓库（依赖 wget）
+      # 步骤 2：验证 bash 可用性
+      ###########################
+      - name: 验证 bash 安装
+        run: |
+          # 检查 bash 是否安装成功（输出路径如 /usr/bin/bash）
+          which bash
+          
+          # 检查 PATH 环境变量是否包含 bash 路径
+          echo "PATH: $PATH"
+          # 预期输出应包含 /usr/bin（bash 默认路径）
+
+      ###########################
+      # 步骤 3：安装 EPEL 仓库（依赖 bash）
       ###########################
       - name: 安装 EPEL 仓库
         run: |
-          # 下载 EPEL 9 最新仓库包（使用已安装的 wget）
+          # 下载 EPEL 9 最新仓库包
           wget -q https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
           
-          # 安装 EPEL 仓库（生成 /etc/yum.repos.d/epel.repo）
+          # 安装 EPEL 仓库
           yum install -y ./epel-release-latest-9.noarch.rpm
 
       ###########################
-      # 步骤 3：启用 EPEL 仓库并安装 pkgconf-pkg-config
+      # 步骤 4：启用 EPEL 仓库并安装 pkgconf-pkg-config
       ###########################
       - name: 启用 EPEL 仓库并安装 pkgconf-pkg-config
         run: |
           # 启用 EPEL 仓库
           yum-config-manager --set-enabled epel
           
-          # 安装 pkgconf-pkg-config（提供兼容的 pkg-config 工具）
+          # 安装 pkgconf-pkg-config
           yum install -y pkgconf-pkg-config
 
       ###########################
-      # 步骤 4：解决 curl 包冲突（可选，若仍冲突）
+      # 步骤 5：安装 Rust 工具链（修复 bash 依赖）
       ###########################
-      - name: 解决 curl 包冲突（可选）
+      - name: 安装 Rust 工具链（使用 rustup）
         run: |
-          # 移除可能冲突的 curl-minimal（若已安装）
-          yum remove -y curl-minimal || true
+          # 安装 rustup（Rust 工具链管理器）
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
+            --default-toolchain 1.85.1 \
+            --component rust-src \
+            --component cargo \
+            --component rustc-dev \
+            --profile minimal \
+            --no-self-update
           
-          # 安装完整版 curl（允许覆盖潜在冲突文件）
-          yum install -y curl --allowerasing
+          # 将 cargo 加入 PATH（可选，若 rustup 未自动配置）
+          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
 
       ###########################
-      # 步骤 5：验证环境（关键检查）
+      # 步骤 6：克隆并编译 Meilisearch 源码
       ###########################
-      - name: 验证环境配置
-        run: |
-          # 检查 wget 是否安装成功
-          wget --version  # 应输出 wget 版本信息（如 "GNU Wget 1.21.4"）
-          
-          # 检查 EPEL 仓库是否启用
-          yum repolist enabled | grep epel  # 应输出 epel 仓库信息
-          
-          # 检查 pkg-config 是否可用
-          pkg-config --version
-          
-          # 检查其他基础工具（git、curl、gcc 等）
-          git --version
-          curl --version
-          gcc --version
-
-      ###########################
-      # 后续步骤（Rust 安装、编译等）保持不变...
-      ###########################
-      - name: 安装 Rust 工具链
-        uses: dtolnay/rust-toolchain@1.85
-        with:
-          toolchain: stable
-          override: true
-          components: rust-src, cargo, rustc-dev
-
       - name: 克隆并检出源码
         run: |
           git clone https://github.com/meilisearch/meilisearch.git
@@ -117,11 +110,17 @@ jobs:
           cd meilisearch
           cargo build --release --locked
 
+      ###########################
+      # 步骤 7：验证 GLIBC 依赖
+      ###########################
       - name: 验证 GLIBC 依赖
         run: |
           cd meilisearch/target/release
           ldd meilisearch | grep GLIBC_
 
+      ###########################
+      # 步骤 8：保存编译产物
+      ###########################
       - name: 保存编译产物
         uses: actions/upload-artifact@v4
         with:
