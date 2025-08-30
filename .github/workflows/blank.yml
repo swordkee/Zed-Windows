@@ -18,7 +18,7 @@ jobs:
 
     steps:
       ###########################
-      # 步骤 1：安装基础工具（含 bash）
+      # 步骤 1：安装基础工具（含 bash、curl、wget）
       ###########################
       - name: 安装基础工具（关键）
         run: |
@@ -26,33 +26,56 @@ jobs:
           yum update -y
           
           # 安装 bash（最小化镜像可能未预装）
-          yum install -y bash wget
+          yum install -y bash
           
-          # 安装其他编译必需工具
-          yum install -y \
-            git \
-            gcc \
-            make \
-            cmake3 \
-            openssl-devel \
-            zlib-devel \
-            which \
-            yum-utils  # 包含 yum-config-manager
+          # 安装 curl（用于下载文件）
+          yum install -y curl
+          
+          # 安装 wget（备用下载工具）
+          yum install -y wget
 
       ###########################
       # 步骤 2：验证 bash 可用性
       ###########################
       - name: 验证 bash 安装
         run: |
-          # 检查 bash 是否安装成功（输出路径如 /usr/bin/bash）
+          # 检查 bash 路径（应输出 /usr/bin/bash）
           which bash
           
-          # 检查 PATH 环境变量是否包含 bash 路径
+          # 检查 PATH 环境变量（应包含 /usr/bin）
           echo "PATH: $PATH"
-          # 预期输出应包含 /usr/bin（bash 默认路径）
 
       ###########################
-      # 步骤 3：安装 EPEL 仓库（依赖 bash）
+      # 步骤 3：安装 Rust 工具链（非交互式）
+      ###########################
+      - name: 安装 Rust 工具链（rustup）
+        run: |
+          # 使用 curl 下载 rustup 安装脚本（确保 curl 已安装）
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+          # 添加 --no-interactive 参数禁用交互式提示
+          sh -s -- \
+            --default-toolchain 1.85.1 \
+            --component rust-src \
+            --component cargo \
+            --component rustc-dev \
+            --profile minimal \
+            --no-self-update \
+            --no-interactive  # 关键：非交互式安装
+
+          # 验证 cargo 是否安装成功（输出版本信息）
+          cargo --version
+
+      ###########################
+      # 步骤 4：配置 cargo 路径（可选，若自动配置失败）
+      ###########################
+      - name: 配置 cargo 路径
+        run: |
+          # 将 cargo 加入 PATH（rustup 通常自动配置，若失败则手动添加）
+          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
+
+      ###########################
+      # 步骤 5：安装 EPEL 仓库（依赖 curl/wget）
       ###########################
       - name: 安装 EPEL 仓库
         run: |
@@ -63,36 +86,18 @@ jobs:
           yum install -y ./epel-release-latest-9.noarch.rpm
 
       ###########################
-      # 步骤 4：启用 EPEL 仓库并安装 pkgconf-pkg-config
+      # 步骤 6：启用 EPEL 仓库并安装 pkgconf-pkg-config
       ###########################
       - name: 启用 EPEL 仓库并安装 pkgconf-pkg-config
         run: |
           # 启用 EPEL 仓库
           yum-config-manager --set-enabled epel
           
-          # 安装 pkgconf-pkg-config
+          # 安装 pkgconf-pkg-config（提供兼容的 pkg-config 工具）
           yum install -y pkgconf-pkg-config
 
       ###########################
-      # 步骤 5：安装 Rust 工具链（修复 bash 依赖）
-      ###########################
-      - name: 安装 Rust 工具链（使用 rustup）
-        run: |
-          # 安装 rustup（Rust 工具链管理器）
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
-            --default-toolchain 1.85.1 \
-            --component rust-src \
-            --component cargo \
-            --component rustc-dev \
-            --profile minimal \
-            --no-self-update
-          
-          # 将 cargo 加入 PATH（可选，若 rustup 未自动配置）
-          echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-          source ~/.bashrc
-
-      ###########################
-      # 步骤 6：克隆并编译 Meilisearch 源码
+      # 步骤 7：克隆并编译 Meilisearch 源码
       ###########################
       - name: 克隆并检出源码
         run: |
@@ -111,7 +116,7 @@ jobs:
           cargo build --release --locked
 
       ###########################
-      # 步骤 7：验证 GLIBC 依赖
+      # 步骤 8：验证 GLIBC 依赖
       ###########################
       - name: 验证 GLIBC 依赖
         run: |
@@ -119,7 +124,7 @@ jobs:
           ldd meilisearch | grep GLIBC_
 
       ###########################
-      # 步骤 8：保存编译产物
+      # 步骤 9：保存编译产物
       ###########################
       - name: 保存编译产物
         uses: actions/upload-artifact@v4
