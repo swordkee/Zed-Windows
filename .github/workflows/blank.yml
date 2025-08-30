@@ -41,11 +41,11 @@ jobs:
       ###########################
       # 步骤 1：检出指定分支代码（默认 1.19.1）
       ###########################
-      - name: 检出代码（标签 1.19.1）
-        uses: actions/checkout@v4
-        with:
-          repository: meilisearch/meilisearch
-          ref: ${{ inputs.branch }}  # 输入参数默认值为 1.19.1
+      - name: 克隆并检出源码
+        run: |
+          git clone https://github.com/meilisearch/meilisearch.git
+          cd meilisearch
+          git checkout tags/v1.19.1
       ###########################
       # 步骤 3：配置 Rust 工具链（稳定版 1.85+）
       ###########################
