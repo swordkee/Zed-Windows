@@ -63,18 +63,9 @@ jobs:
           export CI=true
           
           # 手动下载 rustup 安装脚本（避免 curl 管道符参数丢失）
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-installer.sh
+          curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
           
-          # 非交互式安装（强制接受所有默认选项）
-          sh rustup-installer.sh \
-            --default-toolchain 1.85.1 \
-            --component rust-src \
-            --component cargo \
-            --component rustc-dev \
-            --profile minimal \
-            --no-self-update \
-            --no-interactive \
-            -y  # 强制接受默认选项（关键）
+         
 
           # 清理安装脚本（可选）
           rm -f rustup-installer.sh
