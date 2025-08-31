@@ -76,32 +76,37 @@ jobs:
           echo 'linker = "gcc"' >> ~/.cargo/config
 
       ###########################
-      # 步骤 5：编译发布版（禁用调试优化）
+      # 步骤 5：编译发布版（关键）
       ###########################
-      - name: 编译发布版
+      - name: 编译发布版（禁用调试优化）
         run: |
           cd meilisearch
-          # 使用 --locked 确保依赖版本与源码一致
+          
+          # 使用绝对路径调用 cargo（避免 PATH 问题）
           $HOME/.cargo/bin/cargo build --release --locked
+          
+          # 验证产物存在（输出文件大小）
+          ls -lh target/release/meilisearch
 
       ###########################
-      # 步骤 6：保存构建产物（GitHub Artifacts）
+      # 步骤 6：保存构建产物（修正路径）
       ###########################
-      - name: 保存构建产物
-        uses: actions/upload-artifact@v4  # 升级到 v4（更稳定）
+      - name: 保存构建产物（关键）
+        uses: actions/upload-artifact@v4
         with:
-          name: meilisearch-linux-x86_64-rocky9  # 工件名称（含镜像信息）
-          path: target/release/meilisearch       # 编译产物路径
-          retention-days: 7                      # 保留 7 天
+          name: meilisearch-linux-x86_64-rocky9
+          # 修正路径：使用绝对路径或明确相对路径
+          path: meilisearch/target/release/meilisearch
+          retention-days: 7
 
       ###########################
-      # 步骤 7：上传到 Release（可选，触发发布时）
+      # 步骤 7：上传到 Release（可选）
       ###########################
       - name: 上传到 Release（可选）
-        if: github.event_name == 'release'  # 仅在创建 Release 时触发
+        if: github.event_name == 'release'
         uses: svenstaro/upload-release-action@2.11.2
         with:
-          repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}  # GitHub Token（需提前配置 Secret）
-          file: target/release/meilisearch             # 待上传文件
-          asset_name: meilisearch-linux-x86_64-rocky9  # Release 资产名称
-          tag: ${{ github.ref }}                       # 关联 Release 标签
+          repo_token: ${{ secrets.MEILI_BOT_GH_PAT }}
+          file: meilisearch/target/release/meilisearch  # 修正路径
+          asset_name: meilisearch-linux-x86_64-rocky9
+          tag: ${{ github.ref }}
