@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: '要构建的分支（默认：1.19.1）'
+        description: '要构建的分支（默认：v1.20.0）'
         required: true
-        default: '1.20.0'  # 默认分支改为 1.20.0
+         default: 'v1.20.0'  # 注意加了 'v'
 
 jobs:
   build-linux-x86_64:
@@ -45,7 +45,7 @@ jobs:
         run: |
           git clone https://github.com/meilisearch/meilisearch.git
           cd meilisearch
-          git checkout tags/v1.19.1
+          git checkout ${{ github.event.inputs.branch }}
       ###########################
       # 步骤 3：手动安装 Rust 工具链（非交互式）
       ###########################
