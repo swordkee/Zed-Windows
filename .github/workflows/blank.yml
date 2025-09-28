@@ -6,7 +6,7 @@ on:
       branch:
         description: '要构建的分支（默认：v1.20.0）'
         required: true
-         default: 'v1.20.0'  # 注意加了 'v'
+        default: 'v1.20.0'  # 默认分支改为 1.20.0
 
 jobs:
   build-linux-x86_64:
